@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Memory Agent — Privacy First</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0f14;
+  --surface: #13161e;
+  --surface2: #1a1e28;
+  --surface3: #222636;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.11);
+  --border3: rgba(255,255,255,0.18);
+  --accent: #4ade80;
+  --accent-dim: rgba(74,222,128,0.12);
+  --blue: #60a5fa;
+  --blue-dim: rgba(96,165,250,0.12);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251,191,36,0.12);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── LAYOUT ── */
+.app { display: grid; grid-template-rows: auto auto 1fr; min-height: 100vh; }
+
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border2);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-mark {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 700;
+  color: #000;
+  letter-spacing: -.02em;
+}
+.logo-name {
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 700;
+  color: var(--text);
+}
+.logo-tag { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.privacy-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(74,222,128,0.25);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all .15s;
+}
+.privacy-pill:hover { background: rgba(74,222,128,0.2); }
+.privacy-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+
+.setup-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--amber-dim);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  color: var(--amber);
+  cursor: pointer;
+  transition: all .15s;
+}
+.setup-pill:hover { background: rgba(251,191,36,0.2); }
+
+/* ── STATS BAR ── */
+.statsbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  overflow-x: auto;
+}
+.stat { display: flex; align-items: center; gap: 8px; }
+.stat-val { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.stat-val.green { color: var(--accent); }
+.stat-val.blue { color: var(--blue); }
+.stat-val.amber { color: var(--amber); }
+.stat-val.purple { color: var(--purple); }
+.stat-label { font-size: 11px; color: var(--text3); }
+.stat-divider { width: 1px; height: 20px; background: var(--border2); flex-shrink: 0; }
+
+/* ── MAIN GRID ── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 0;
+  height: calc(100vh - 54px - 41px);
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.left-panel {
+  padding: 20px 20px 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── SEARCH BOX ── */
+.search-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.search-card:focus-within { border-color: var(--accent); }
+
+.search-inner { padding: 14px 16px; }
+.search-lbl {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--accent);
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.enc-badge {
+  font-size: 9px; padding: 1px 6px; border-radius: 4px;
+  background: var(--accent-dim); color: var(--accent);
+  border: 1px solid rgba(74,222,128,.2);
+}
+
+textarea#query {
+  width: 100%; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--sans); font-size: 15px;
+  font-weight: 400; resize: none; line-height: 1.6; min-height: 72px;
+}
+textarea#query::placeholder { color: var(--text3); }
+
+.search-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.depth-row { display: flex; flex-direction: column; gap: 4px; }
+.depth-btns { display: flex; gap: 4px; }
+.depth-btn {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--border2);
+  background: transparent; color: var(--text3);
+  cursor: pointer; transition: all .15s; letter-spacing: .02em;
+}
+.depth-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.depth-hint { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+.run-btn {
+  background: var(--accent); color: #000;
+  border: none; border-radius: var(--radius);
+  padding: 9px 22px; font-family: var(--mono);
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; letter-spacing: .04em;
+  transition: opacity .15s, transform .1s;
+  display: flex; align-items: center; gap: 8px;
+}
+.run-btn:hover { opacity: .88; }
+.run-btn:active { transform: scale(0.97); }
+.run-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+/* ── AGENT LOG ── */
+.log-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.log-header {
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--text3);
+}
+.log-body {
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: var(--mono);
+}
+.log-line { font-size: 11px; line-height: 1.9; display: flex; gap: 8px; }
+.log-ts { color: var(--text3); min-width: 52px; }
+.log-msg { }
+.log-msg.ok { color: var(--accent); }
+.log-msg.info { color: var(--blue); }
+.log-msg.warn { color: var(--amber); }
+.log-msg.err { color: var(--red); }
+.log-msg.sec { color: var(--purple); }
+
+/* ── MEMORY CONTEXT BANNER ── */
+.mem-banner {
+  background: var(--accent-dim);
+  border: 1px solid rgba(74,222,128,.2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px; color: var(--accent); line-height: 1.6;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.mem-banner-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── SUB-QUERIES ── */
+.subq-section {}
+.section-head {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text3); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.subq-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.subq-chip {
+  font-size: 11px; font-family: var(--mono);
+  padding: 3px 10px; border-radius: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  transition: all .2s;
+}
+.subq-chip.running { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+.subq-chip.done { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+/* ── RESULTS ── */
+.results-section {}
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 8px;
+  transition: border-color .15s;
+}
+.result-card:hover { border-color: var(--border3); }
+
+.result-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+.result-title { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4; flex: 1; }
+
+.score-badge {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 5px; white-space: nowrap; flex-shrink: 0;
+}
+.s-high { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(74,222,128,.2); }
+.s-mid  { background: var(--blue-dim);  color: var(--blue);  border: 1px solid rgba(96,165,250,.2); }
+.s-low  { background: var(--surface3);  color: var(--text3); border: 1px solid var(--border2); }
+
+.result-url {
+  font-size: 11px; font-family: var(--mono);
+  color: var(--text3); margin-bottom: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.result-highlight { font-size: 12px; color: var(--text2); line-height: 1.65; margin-bottom: 10px; }
+
+.result-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 10px; border-top: 1px solid var(--border);
+}
+.fb-row { display: flex; gap: 5px; align-items: center; }
+.fb-lbl { font-size: 10px; color: var(--text3); font-family: var(--mono); margin-right: 2px; }
+.fb-btn {
+  font-size: 11px; font-family: var(--mono);
+  padding: 3px 10px; border-radius: 5px;
+  border: 1px solid var(--border2);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.fb-btn.yes { color: var(--accent); }
+.fb-btn.yes:hover, .fb-btn.yes.sel { background: var(--accent-dim); border-color: rgba(74,222,128,.3); }
+.fb-btn.no { color: var(--red); }
+.fb-btn.no:hover, .fb-btn.no.sel { background: var(--red-dim); border-color: rgba(248,113,113,.3); }
+.fb-btn.save { color: var(--amber); }
+.fb-btn.save:hover, .fb-btn.save.sel { background: var(--amber-dim); border-color: rgba(251,191,36,.3); }
+.fb-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.privacy-note {
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+  display: flex; align-items: center; gap: 4px;
+}
+.privacy-note .lock { color: var(--accent); }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.tab-btn {
+  flex: 1; padding: 10px 8px;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text3); background: transparent; border: none;
+  cursor: pointer; transition: all .15s;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.panel-body { flex: 1; overflow-y: auto; padding: 14px; }
+
+/* Memory tab */
+.mem-empty {
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 24px 16px; text-align: center;
+  color: var(--text3); font-size: 12px; line-height: 1.8;
+}
+.mem-empty .big { font-size: 24px; margin-bottom: 6px; }
+
+.mem-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 12px; margin-bottom: 8px;
+  cursor: pointer; transition: all .15s;
+}
+.mem-card:hover { border-color: var(--border3); border-left-color: var(--accent); }
+.mem-q { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.4; margin-bottom: 4px; }
+.mem-meta { font-size: 10px; font-family: var(--mono); color: var(--text3); display: flex; gap: 8px; flex-wrap: wrap; }
+.mem-meta .g { color: var(--accent); }
+.mem-del {
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+  background: none; border: none; cursor: pointer; padding: 0;
+  transition: color .15s; margin-left: auto;
+}
+.mem-del:hover { color: var(--red); }
+
+.clear-all-btn {
+  width: 100%; padding: 8px; margin-bottom: 12px;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  background: var(--red-dim); color: var(--red);
+  border: 1px solid rgba(248,113,113,.2);
+  border-radius: var(--radius); cursor: pointer; transition: all .15s;
+}
+.clear-all-btn:hover { background: rgba(248,113,113,.2); }
+
+/* Learning tab */
+.learning-section { margin-bottom: 16px; }
+.learning-title {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text3); margin-bottom: 10px;
+}
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.bar-lbl { font-size: 11px; color: var(--text2); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { width: 70px; height: 4px; background: var(--surface3); border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s ease; }
+.bar-fill.bad { background: var(--red); }
+.bar-pct { font-size: 10px; font-family: var(--mono); color: var(--accent); min-width: 28px; text-align: right; flex-shrink: 0; }
+.bar-pct.bad { color: var(--red); }
+.no-learning { font-size: 12px; color: var(--text3); text-align: center; padding: 16px 0; }
+
+/* Privacy tab */
+.privacy-section { margin-bottom: 16px; }
+.privacy-heading {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text3); margin-bottom: 8px;
+}
+.privacy-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; margin-bottom: 6px;
+}
+.pi-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.pi-body {}
+.pi-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.pi-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+.pi-status {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  padding: 1px 7px; border-radius: 4px; margin-top: 4px; display: inline-block;
+}
+.pi-ok { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(74,222,128,.2); }
+.pi-warn { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,.2); }
+.pi-bad { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+
+.data-map {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; margin-bottom: 6px;
+}
+.dm-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+.dm-row:last-child { border-bottom: none; }
+.dm-label { color: var(--text2); }
+.dm-val { font-family: var(--mono); color: var(--accent); }
+.dm-val.red { color: var(--red); }
+.dm-val.amber { color: var(--amber); }
+
+.export-btn, .wipe-btn {
+  width: 100%; padding: 8px; margin-bottom: 6px;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  border-radius: var(--radius); cursor: pointer; transition: all .15s;
+}
+.export-btn { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,.2); }
+.export-btn:hover { background: rgba(96,165,250,.2); }
+.wipe-btn { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+.wipe-btn:hover { background: rgba(248,113,113,.2); }
+
+/* ── SETUP MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border3);
+  border-radius: var(--radius-lg);
+  padding: 24px; width: 100%; max-width: 480px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6);
+}
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.modal-sub { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+.modal-label { font-size: 11px; font-family: var(--mono); font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.modal-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 10px 12px;
+  color: var(--text); font-family: var(--mono); font-size: 12px; outline: none;
+  transition: border-color .15s; margin-bottom: 14px;
+}
+.modal-input:focus { border-color: var(--accent); }
+.modal-input::placeholder { color: var(--text3); }
+.modal-warning {
+  background: var(--amber-dim); border: 1px solid rgba(251,191,36,.2);
+  border-radius: var(--radius); padding: 10px 12px; margin-bottom: 16px;
+  font-size: 11px; color: var(--amber); line-height: 1.6;
+}
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-save {
+  background: var(--accent); color: #000;
+  border: none; border-radius: var(--radius);
+  padding: 8px 20px; font-family: var(--mono); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s;
+}
+.modal-save:hover { opacity: .88; }
+.modal-cancel {
+  background: transparent; color: var(--text3);
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  padding: 8px 16px; font-family: var(--mono); font-size: 12px;
+  cursor: pointer; transition: all .15s;
+}
+.modal-cancel:hover { border-color: var(--border3); color: var(--text); }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  padding: 50px 20px; text-align: center; color: var(--text3); font-size: 13px; line-height: 1.9;
+}
+.empty-state .big { font-size: 32px; margin-bottom: 10px; }
+
+/* ── SPINNER / PULSE ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 13px; height: 13px;
+  border: 2px solid rgba(74,222,128,.25);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .65s linear infinite; display: inline-block;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.pulse { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 1.1s ease-in-out infinite; display: inline-block; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 999px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">SMA</div>
+      <div>
+        <div class="logo-name">Search Memory Agent</div>
+        <div class="logo-tag">Powered by Exa API</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="privacy-pill" onclick="switchTab('privacy')">
+        <div class="privacy-dot"></div>
+        Privacy: Local-only
+      </div>
+      <div class="setup-pill" onclick="openSetup()">
+        ⚙ API Setup
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="statsbar">
+    <div class="stat">
+      <span class="stat-val green" id="s-searches">0</span>
+      <span class="stat-label">Searches</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat-val blue" id="s-memories">0</span>
+      <span class="stat-label">Memories</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat-val amber" id="s-avgq">—</span>
+      <span class="stat-label">Avg Quality</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat-val purple" id="s-feedback">0</span>
+      <span class="stat-label">Feedback signals</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat-val green" style="font-size:11px">🔒 Local</span>
+      <span class="stat-label">Data storage</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat">
+      <span class="stat-val green" style="font-size:11px">🚫 None</span>
+      <span class="stat-label">3rd party tracking</span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- LEFT -->
+    <div class="left-panel">
+
+      <!-- Search card -->
+      <div class="search-card">
+        <div class="search-inner">
+          <div class="search-lbl">
+            Research Query
+            <span class="enc-badge">🔒 stays on your device</span>
+          </div>
+          <textarea id="query" placeholder="e.g. 'Latest breakthroughs in neural search engines' or 'How does semantic embedding work?' (Ctrl+Enter to run)"></textarea>
+        </div>
+        <div class="search-footer">
+          <div class="depth-row">
+            <div class="depth-btns">
+              <button class="depth-btn" onclick="setDepth('fast',this)">Fast</button>
+              <button class="depth-btn active" onclick="setDepth('auto',this)">Auto</button>
+              <button class="depth-btn" onclick="setDepth('deep-lite',this)">Deep</button>
+            </div>
+            <div class="depth-hint" id="depth-hint">~1s · balanced quality</div>
+          </div>
+          <button class="run-btn" id="run-btn" onclick="runAgent()">
+            <span id="btn-icon">▶</span>
+            <span id="btn-txt">Run Agent</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Agent log -->
+      <div class="log-card">
+        <div class="log-header">
+          <span class="pulse" id="log-pulse" style="opacity:0"></span>
+          Agent Log
+        </div>
+        <div class="log-body" id="log-body">
+          <div class="log-line"><span class="log-ts">00:00</span><span class="log-msg">Agent ready. Enter a query to begin.</span></div>
+        </div>
+      </div>
+
+      <!-- Memory context banner (shown when memory hit) -->
+      <div id="mem-banner" style="display:none"></div>
+
+      <!-- Sub-queries -->
+      <div id="subq-section" style="display:none">
+        <div class="section-head">Sub-queries <span class="pulse" style="margin-left:4px"></span></div>
+        <div class="subq-list" id="subq-list"></div>
+      </div>
+
+      <!-- Results -->
+      <div id="results-section" style="display:none">
+        <div class="section-head">
+          Results
+          <span style="font-size:10px;font-family:var(--mono);color:var(--text3);background:var(--surface2);padding:1px 7px;border-radius:4px;border:1px solid var(--border2)" id="res-count">0</span>
+        </div>
+        <div id="results-list"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="empty-state" class="empty-state">
+        <div class="big">🔍</div>
+        <div>Enter a research question above.<br>
+        The agent decomposes it, searches Exa, scores results,<br>
+        and <strong style="color:var(--text2)">learns from your feedback</strong> — entirely on your device.</div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="panel-tabs">
+        <button class="tab-btn active" id="tab-mem" onclick="switchTab('memory')">Memory</button>
+        <button class="tab-btn" id="tab-learn" onclick="switchTab('learning')">Learning</button>
+        <button class="tab-btn" id="tab-priv" onclick="switchTab('privacy')">Privacy</button>
+      </div>
+
+      <!-- Memory tab -->
+      <div class="panel-body" id="panel-memory">
+        <div id="mem-list">
+          <div class="mem-empty">
+            <div class="big">🧠</div>
+            <div>No memories yet.<br>Click 💾 on any result to save it.<br><br>Saved memories are used to improve future searches.</div>
+          </div>
+        </div>
+        <button class="clear-all-btn" onclick="clearAllMemory()" style="margin-top:8px">🗑 Clear All Memories</button>
+      </div>
+
+      <!-- Learning tab -->
+      <div class="panel-body" id="panel-learning" style="display:none">
+        <div class="learning-section">
+          <div class="learning-title">Top trusted domains</div>
+          <div id="trusted-domains"><div class="no-learning">No feedback yet. Use 👍👎 on results.</div></div>
+        </div>
+        <div class="learning-section">
+          <div class="learning-title">Noisy domains to avoid</div>
+          <div id="noisy-domains"><div class="no-learning">—</div></div>
+        </div>
+        <div class="learning-section">
+          <div class="learning-title">Query improvement</div>
+          <div id="query-improvement">
+            <div class="data-map">
+              <div class="dm-row"><span class="dm-label">Sessions run</span><span class="dm-val" id="li-sessions">0</span></div>
+              <div class="dm-row"><span class="dm-label">Positive signals</span><span class="dm-val" id="li-pos">0</span></div>
+              <div class="dm-row"><span class="dm-label">Negative signals</span><span class="dm-val red" id="li-neg">0</span></div>
+              <div class="dm-row"><span class="dm-label">Domains learned</span><span class="dm-val" id="li-dom">0</span></div>
+              <div class="dm-row"><span class="dm-label">Precision rate</span><span class="dm-val" id="li-prec">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Privacy tab -->
+      <div class="panel-body" id="panel-privacy" style="display:none">
+        <div class="privacy-section">
+          <div class="privacy-heading">Data storage map</div>
+          <div class="data-map">
+            <div class="dm-row"><span class="dm-label">Queries stored</span><span class="dm-val amber" id="pv-queries">0</span></div>
+            <div class="dm-row"><span class="dm-label">Memories saved</span><span class="dm-val" id="pv-memories">0</span></div>
+            <div class="dm-row"><span class="dm-label">Feedback signals</span><span class="dm-val" id="pv-signals">0</span></div>
+            <div class="dm-row"><span class="dm-label">Storage location</span><span class="dm-val">Browser only</span></div>
+            <div class="dm-row"><span class="dm-label">Sent to Exa servers</span><span class="dm-val amber">Queries only</span></div>
+            <div class="dm-row"><span class="dm-label">Sent to any other server</span><span class="dm-val" style="color:var(--accent)">Nothing</span></div>
+            <div class="dm-row"><span class="dm-label">API key stored</span><span class="dm-val amber">sessionStorage</span></div>
+          </div>
+        </div>
+
+        <div class="privacy-section">
+          <div class="privacy-heading">Privacy controls</div>
+
+          <div class="privacy-item">
+            <div class="pi-icon">🔒</div>
+            <div class="pi-body">
+              <div class="pi-title">Local-only memory</div>
+              <div class="pi-desc">All memories, feedback signals, and learning data are stored in your browser's localStorage. Nothing is synced to any server.</div>
+              <div class="pi-status pi-ok">✓ ENABLED</div>
+            </div>
+          </div>
+
+          <div class="privacy-item">
+            <div class="pi-icon">⚠️</div>
+            <div class="pi-body">
+              <div class="pi-title">Query data sent to Exa</div>
+              <div class="pi-desc">Your search queries are sent to Exa's API to retrieve results. Exa's privacy policy governs their handling. Your query text leaves this device.</div>
+              <div class="pi-status pi-warn">⚠ REQUIRED FOR SEARCH</div>
+            </div>
+          </div>
+
+          <div class="privacy-item">
+            <div class="pi-icon">🚫</div>
+            <div class="pi-body">
+              <div class="pi-title">No analytics / tracking</div>
+              <div class="pi-desc">Zero third-party analytics, no cookies, no fingerprinting. This app has no telemetry of any kind.</div>
+              <div class="pi-status pi-ok">✓ NONE</div>
+            </div>
+          </div>
+
+          <div class="privacy-item">
+            <div class="pi-icon">⚠️</div>
+            <div class="pi-body">
+              <div class="pi-title">API key security</div>
+              <div class="pi-desc">Your Exa API key is stored in sessionStorage (cleared when tab closes). In production, route calls through a backend proxy instead — never expose keys in a frontend.</div>
+              <div class="pi-status pi-warn">⚠ SESSION ONLY</div>
+            </div>
+          </div>
+
+          <div class="privacy-item">
+            <div class="pi-icon">🔑</div>
+            <div class="pi-body">
+              <div class="pi-title">Right to erasure</div>
+              <div class="pi-desc">You can wipe all local data at any time. This deletes all memories, learning signals, and settings from this browser.</div>
+              <div class="pi-status pi-ok">✓ ONE-CLICK WIPE</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="export-btn" onclick="exportData()">📤 Export my data (JSON)</button>
+        <button class="wipe-btn" onclick="wipeAllData()">🗑 Wipe all local data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="modal-overlay" id="setup-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">⚙ API Configuration</div>
+    <div class="modal-sub">Your API key is stored in sessionStorage only — it's cleared when you close this tab.</div>
+
+    <div class="modal-label">Exa API Key</div>
+    <input class="modal-input" type="password" id="api-key-input" placeholder="exa-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+
+    <div class="modal-warning">
+      ⚠️ <strong>Security note:</strong> Never commit your API key to git or share it publicly. In a production deployment, route API calls through a backend proxy — never expose keys in frontend code.
+    </div>
+
+    <div class="modal-footer">
+      <button class="modal-cancel" onclick="closeSetup()">Cancel</button>
+      <button class="modal-save" onclick="saveApiKey()">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+const STORAGE_KEY = 'sma_memories_v2';
+const SIGNALS_KEY = 'sma_signals_v2';
+const STATS_KEY   = 'sma_stats_v2';
+
+let memory      = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let signals     = JSON.parse(localStorage.getItem(SIGNALS_KEY) || '{}');
+let stats       = JSON.parse(localStorage.getItem(STATS_KEY)   || '{"searches":0,"feedback":0,"pos":0,"neg":0,"scores":[]}');
+let searchDepth = 'auto';
+let running     = false;
+
+// Load API key from sessionStorage (cleared on tab close)
+let API_KEY = sessionStorage.getItem('sma_exa_key') || '2d0c8e98-9956-44ca-ac31-68698231eef0';
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
+  localStorage.setItem(SIGNALS_KEY, JSON.stringify(signals));
+  localStorage.setItem(STATS_KEY,   JSON.stringify(stats));
+}
+
+// ── DEPTH ──
+const depthInfo = {
+  'fast':      '~450ms · real-time speed',
+  'auto':      '~1s · balanced quality',
+  'deep-lite': '~4s · deeper synthesis'
+};
+function setDepth(val, btn) {
+  searchDepth = val;
+  document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('depth-hint').textContent = depthInfo[val];
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  ['memory','learning','privacy'].forEach(t => {
+    document.getElementById('panel-'+t).style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-'+t.slice(0,4)).classList.toggle('active', t === tab);
+  });
+  // fix tab id mismatch
+  document.getElementById('tab-mem').classList.toggle('active', tab === 'memory');
+  document.getElementById('tab-learn').classList.toggle('active', tab === 'learning');
+  document.getElementById('tab-priv').classList.toggle('active', tab === 'privacy');
+
+  if (tab === 'learning') renderLearning();
+  if (tab === 'privacy') renderPrivacy();
+}
+
+// ── SETUP MODAL ──
+function openSetup()  { document.getElementById('setup-modal').style.display = 'flex'; document.getElementById('api-key-input').value = API_KEY || ''; }
+function closeSetup() { document.getElementById('setup-modal').style.display = 'none'; }
+function saveApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  API_KEY = val;
+  sessionStorage.setItem('sma_exa_key', val);
+  closeSetup();
+  log('API key updated (session only).', 'sec');
+}
+
+// ── LOGGING ──
+function ts() { const n = new Date(); return `${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`; }
+function log(msg, type='') {
+  const el = document.getElementById('log-body');
+  const d  = document.createElement('div');
+  d.className = 'log-line';
+  d.innerHTML = `<span class="log-ts">${ts()}</span><span class="log-msg ${type}">${msg}</span>`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog() { document.getElementById('log-body').innerHTML = ''; }
+
+// ── SCORING ──
+function scoreResult(r, query) {
+  const text  = ((r.title||'') + ' ' + (r.highlights ? r.highlights.join(' ') : '')).toLowerCase();
+  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const hits  = words.filter(w => text.includes(w)).length;
+  let base    = words.length ? hits / words.length : 0;
+  if (r.score)                              base = Math.max(base, r.score);
+  if (r.highlights && r.highlights.length) base = Math.min(base + 0.12, 1);
+  // boost trusted domains
+  try {
+    const dom = new URL(r.url).hostname.replace('www.','');
+    const sig = signals[dom];
+    if (sig && (sig.yes + sig.no) > 0) {
+      const trust = sig.yes / (sig.yes + sig.no);
+      base = base * 0.8 + trust * 0.2;
+    }
+  } catch {}
+  return Math.min(Math.round(base * 100) / 100, 1.0);
+}
+
+function scoreBadge(s) {
+  if (s >= 0.65) return `<span class="score-badge s-high">${Math.round(s*100)}%</span>`;
+  if (s >= 0.35) return `<span class="score-badge s-mid">${Math.round(s*100)}%</span>`;
+  return `<span class="score-badge s-low">${Math.round(s*100)}%</span>`;
+}
+
+// ── MEMORY MATCH ──
+function findMemoryMatch(query) {
+  if (!memory.length) return null;
+  const qw = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  let best = null, bestScore = 0;
+  for (const m of memory) {
+    const mw = m.query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const overlap = qw.filter(w => mw.includes(w)).length;
+    const score = overlap / Math.max(qw.length, mw.length, 1);
+    if (score > bestScore && score > 0.28) { best = m; bestScore = score; }
+  }
+  return best;
+}
+
+// ── BUILD SUB-QUERIES ──
+function buildSubqueries(query) {
+  const base = query.trim();
+  const words = base.split(' ');
+  const subqs = [base];
+  if (words.length > 3) {
+    subqs.push('latest developments ' + words.slice(0,4).join(' '));
+    subqs.push(words.slice(0,3).join(' ') + ' explained overview');
+  } else {
+    subqs.push('latest ' + base);
+    subqs.push(base + ' overview');
+  }
+  return subqs.slice(0,3);
+}
+
+// ── EXA API ──
+async function exaSearch(query) {
+  if (!API_KEY) throw new Error('No API key set. Click "API Setup" to add yours.');
+  const body = {
+    query,
+    type: searchDepth,
+    num_results: 5,
+    contents: { highlights: { num_sentences: 2, highlights_per_url: 1 } }
+  };
+  const res = await fetch('https://api.exa.ai/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Exa ${res.status}: ${err.slice(0,120)}`);
+  }
+  return res.json();
+}
+
+// ── RENDER RESULTS ──
+function renderResults(results, query) {
+  const list = document.getElementById('results-list');
+  list.innerHTML = '';
+  document.getElementById('res-count').textContent = results.length;
+
+  results.forEach((r, i) => {
+    const score = scoreResult(r, query);
+    stats.scores.push(score);
+    const domain = (() => { try { return new URL(r.url).hostname.replace('www.',''); } catch { return '—'; } })();
+    const hl = r.highlights && r.highlights[0] ? r.highlights[0] : (r.text ? r.text.slice(0,200)+'…' : 'No preview available.');
+
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.dataset.idx = i;
+    card.innerHTML = `
+      <div class="result-top">
+        <div class="result-title">${escHtml(r.title || 'Untitled')}</div>
+        ${scoreBadge(score)}
+      </div>
+      <div class="result-url">${escHtml(domain)}</div>
+      <div class="result-highlight">${escHtml(hl)}</div>
+      <div class="result-meta">
+        <div class="fb-row">
+          <span class="fb-lbl">Useful?</span>
+          <button class="fb-btn yes" onclick="feedback(${i},'yes',this,'${escAttr(domain)}',${score})">👍 Yes</button>
+          <button class="fb-btn no"  onclick="feedback(${i},'no', this,'${escAttr(domain)}',${score})">👎 No</button>
+          <button class="fb-btn save" onclick="saveMemory(${i},'${escAttr(query)}','${escAttr(r.title||'')}','${escAttr(domain)}',this)">💾 Save</button>
+        </div>
+        <div class="privacy-note"><span class="lock">🔒</span> feedback stays local</div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+  updateStats();
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/\n/g,' '); }
+
+// ── FEEDBACK ──
+function feedback(idx, type, btn, domain, score) {
+  const row = btn.closest('.fb-row');
+  row.querySelectorAll('.fb-btn.yes,.fb-btn.no').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+
+  if (!signals[domain]) signals[domain] = { yes: 0, no: 0 };
+  signals[domain][type]++;
+  stats.feedback++;
+  if (type === 'yes') stats.pos++; else stats.neg++;
+  saveState();
+  updateStats();
+  log(`Feedback: ${type === 'yes' ? '✓ relevant' : '✗ irrelevant'} — ${domain}`, type === 'yes' ? 'ok' : 'warn');
+}
+
+// ── SAVE MEMORY ──
+function saveMemory(idx, query, title, domain, btn) {
+  btn.classList.add('sel');
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+
+  const existing = memory.find(m => m.query === query);
+  if (existing) {
+    existing.savedCount++;
+    if (!existing.domains.includes(domain)) existing.domains.push(domain);
+  } else {
+    memory.push({
+      id: Date.now(),
+      query,
+      title,
+      domain,
+      domains: [domain],
+      savedCount: 1,
+      ts: new Date().toLocaleString()
+    });
+  }
+  saveState();
+  renderMemory();
+  updateStats();
+  log(`Memory saved: "${query.slice(0,45)}…"`, 'sec');
+}
+
+// ── RENDER MEMORY ──
+function renderMemory() {
+  const el = document.getElementById('mem-list');
+  if (!memory.length) {
+    el.innerHTML = `<div class="mem-empty"><div class="big">🧠</div><div>No memories yet.<br>Click 💾 on results to save.<br>Memories improve future searches.</div></div>`;
+    return;
+  }
+  el.innerHTML = memory.slice().reverse().map(m => `
+    <div class="mem-card" onclick="prefillQuery('${escAttr(m.query)}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
+        <div class="mem-q">${escHtml(m.query.slice(0,70))}${m.query.length>70?'…':''}</div>
+        <button class="mem-del" onclick="event.stopPropagation();deleteMemory(${m.id})">✕</button>
+      </div>
+      <div class="mem-meta">
+        <span>${escHtml(m.ts)}</span>
+        <span class="g">+${m.savedCount} saved</span>
+        <span>${escHtml(m.domain)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function prefillQuery(q) {
+  document.getElementById('query').value = q;
+  document.getElementById('query').focus();
+}
+
+function deleteMemory(id) {
+  memory = memory.filter(m => m.id !== id);
+  saveState();
+  renderMemory();
+  updateStats();
+  log('Memory entry deleted.', 'warn');
+}
+
+function clearAllMemory() {
+  if (!confirm('Delete all saved memories? This cannot be undone.')) return;
+  memory = [];
+  saveState();
+  renderMemory();
+  updateStats();
+  log('All memories cleared.', 'warn');
+}
+
+// ── RENDER LEARNING ──
+function renderLearning() {
+  const doms = Object.entries(signals)
+    .map(([d, s]) => ({ d, trust: s.yes / Math.max(s.yes+s.no,1), total: s.yes+s.no, pos: s.yes, neg: s.no }))
+    .filter(x => x.total > 0);
+
+  const trusted = doms.filter(x => x.trust >= 0.5).sort((a,b) => b.trust-a.trust).slice(0,6);
+  const noisy   = doms.filter(x => x.trust <  0.5).sort((a,b) => a.trust-b.trust).slice(0,4);
+
+  const el1 = document.getElementById('trusted-domains');
+  el1.innerHTML = trusted.length ? trusted.map(x => `
+    <div class="bar-row">
+      <span class="bar-lbl">${escHtml(x.d)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(x.trust*100)}%"></div></div>
+      <span class="bar-pct">${Math.round(x.trust*100)}%</span>
+    </div>
+  `).join('') : '<div class="no-learning">No positive feedback yet.</div>';
+
+  const el2 = document.getElementById('noisy-domains');
+  el2.innerHTML = noisy.length ? noisy.map(x => `
+    <div class="bar-row">
+      <span class="bar-lbl">${escHtml(x.d)}</span>
+      <div class="bar-track"><div class="bar-fill bad" style="width:${Math.round((1-x.trust)*100)}%"></div></div>
+      <span class="bar-pct bad">${Math.round((1-x.trust)*100)}% noise</span>
+    </div>
+  `).join('') : '<div class="no-learning">No noisy domains identified.</div>';
+
+  const total = stats.pos + stats.neg;
+  document.getElementById('li-sessions').textContent = stats.searches;
+  document.getElementById('li-pos').textContent      = stats.pos;
+  document.getElementById('li-neg').textContent      = stats.neg;
+  document.getElementById('li-dom').textContent      = Object.keys(signals).length;
+  document.getElementById('li-prec').textContent     = total ? Math.round(stats.pos/total*100)+'%' : '—';
+}
+
+// ── RENDER PRIVACY ──
+function renderPrivacy() {
+  document.getElementById('pv-queries').textContent  = stats.searches;
+  document.getElementById('pv-memories').textContent = memory.length;
+  document.getElementById('pv-signals').textContent  = stats.feedback;
+}
+
+// ── STATS ──
+function updateStats() {
+  document.getElementById('s-searches').textContent = stats.searches;
+  document.getElementById('s-memories').textContent = memory.length;
+  document.getElementById('s-feedback').textContent = stats.feedback;
+  if (stats.scores.length) {
+    const avg = stats.scores.reduce((a,b)=>a+b,0) / stats.scores.length;
+    document.getElementById('s-avgq').textContent = Math.round(avg*100) + '%';
+  }
+}
+
+// ── EXPORT ──
+function exportData() {
+  const blob = new Blob([JSON.stringify({ memories: memory, signals, stats, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sma-export-${Date.now()}.json`;
+  a.click();
+  log('Data exported to JSON.', 'sec');
+}
+
+function wipeAllData() {
+  if (!confirm('Wipe ALL local data? This deletes memories, signals, and stats permanently.')) return;
+  memory = []; signals = {}; stats = { searches:0, feedback:0, pos:0, neg:0, scores:[] };
+  saveState();
+  renderMemory(); renderLearning(); renderPrivacy(); updateStats();
+  log('All local data wiped.', 'warn');
+}
+
+// ── MAIN AGENT LOOP ──
+async function runAgent() {
+  const query = document.getElementById('query').value.trim();
+  if (!query || running) return;
+  running = true;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> <span>Running…</span>';
+  document.getElementById('log-pulse').style.opacity = '1';
+
+  // reset UI
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('subq-section').style.display = 'none';
+  document.getElementById('mem-banner').style.display = 'none';
+  clearLog();
+
+  log('Agent started.', 'info');
+
+  // Memory check
+  const memHit = findMemoryMatch(query);
+  if (memHit) {
+    log(`Memory match: "${memHit.query.slice(0,40)}…"`, 'sec');
+    const banner = document.getElementById('mem-banner');
+    banner.style.display = 'flex';
+    banner.innerHTML = `<div class="mem-banner"><div class="mem-banner-icon">🧠</div><div><strong>Memory context applied</strong> — Found related past search: "<em>${escHtml(memHit.query.slice(0,60))}</em>". Trusted sources from: <strong>${memHit.domains.slice(0,3).join(', ')}</strong>. Relevance scoring boosted accordingly.</div></div>`;
+  } else {
+    log('No memory match. Fresh search.', '');
+  }
+
+  // Sub-queries
+  const subqs = buildSubqueries(query);
+  log(`Decomposed into ${subqs.length} sub-queries.`, 'info');
+
+  const sqSection = document.getElementById('subq-section');
+  const sqList    = document.getElementById('subq-list');
+  sqSection.style.display = 'block';
+  sqList.innerHTML = subqs.map((q,i) => `<div class="subq-chip" id="sq-${i}">${escHtml(q)}</div>`).join('');
+
+  let allResults = [];
+  for (let i = 0; i < subqs.length; i++) {
+    const chip = document.getElementById(`sq-${i}`);
+    chip.classList.add('running');
+    log(`Searching Exa: "${subqs[i].slice(0,50)}"`, 'info');
+    try {
+      const data = await exaSearch(subqs[i]);
+      if (data.results) { allResults.push(...data.results); }
+      chip.classList.remove('running'); chip.classList.add('done');
+      log(`↳ Got ${data.results ? data.results.length : 0} results.`, 'ok');
+    } catch(e) {
+      chip.classList.remove('running');
+      log(`↳ Error: ${e.message}`, 'err');
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  stats.searches++;
+  saveState();
+
+  // Deduplicate
+  const seen = new Set();
+  allResults = allResults.filter(r => { if (seen.has(r.url)) return false; seen.add(r.url); return true; });
+
+  // Sort by score
+  allResults.sort((a,b) => scoreResult(b, query) - scoreResult(a, query));
+  const top = allResults.slice(0, 8);
+
+  log(`Showing top ${top.length} results (deduped). Use 👍👎💾 to train memory.`, 'ok');
+
+  document.getElementById('results-section').style.display = 'block';
+  renderResults(top, query);
+  renderMemory();
+
+  document.getElementById('log-pulse').style.opacity = '0';
+  btn.disabled = false;
+  btn.innerHTML = '<span>▶</span> <span>Run Agent</span>';
+  running = false;
+}
+
+// Ctrl+Enter
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runAgent();
+});
+
+// Init
+renderMemory();
+updateStats();
+</script>
+</body>
+</html>

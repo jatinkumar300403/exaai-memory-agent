@@ -1,0 +1,14 @@
+{
+  "name": "search-memory-agent",
+  "version": "1.0.0",
+  "description": "Privacy-first research tool with Exa API + continual learning loop",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  }
+}

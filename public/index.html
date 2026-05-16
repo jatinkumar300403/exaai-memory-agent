@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Memory Agent</title>
+<meta name="description" content="AI-powered research tool with continual learning. Powered by Exa neural search + Gemini AI judge.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0b0f;
+  --surface: #111318;
+  --surface2: #181b24;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --accent: #4ade80;
+  --accent-dim: rgba(74,222,128,0.1);
+  --blue: #60a5fa;
+  --amber: #fbbf24;
+  --amber-dim: rgba(251,191,36,0.1);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,0.1);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.1);
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+
+/* ── LAYOUT ── */
+.app { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+
+/* ── HEADER ── */
+.header { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+.logo-mark {
+  width: 28px; height: 28px; background: var(--accent); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 10px; font-weight: 700; color: #000;
+}
+.header-text h1 { font-family: var(--mono); font-size: 14px; font-weight: 700; line-height: 1.2; }
+.header-text p { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+
+/* ── SEARCH ── */
+.search-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 12px; overflow: hidden; transition: border-color .2s;
+  margin-bottom: 12px;
+}
+.search-box:focus-within { border-color: var(--accent); }
+
+textarea#query {
+  width: 100%; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--sans); font-size: 15px;
+  padding: 16px; resize: none; line-height: 1.5; min-height: 60px;
+}
+textarea#query::placeholder { color: var(--text3); }
+
+.search-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface2);
+  gap: 8px; flex-wrap: wrap;
+}
+
+.controls-left { display: flex; align-items: center; gap: 10px; }
+
+.depth-btns { display: flex; gap: 3px; }
+.depth-btn {
+  font-size: 10px; font-family: var(--mono); font-weight: 700;
+  padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text3); cursor: pointer; transition: all .15s;
+}
+.depth-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+.ai-toggle { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 10px; font-family: var(--mono); font-weight: 700; color: var(--purple); }
+.ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border2); transition: all .2s; }
+.ai-dot.on { background: var(--purple); border-color: var(--purple); box-shadow: 0 0 6px rgba(167,139,250,.4); }
+
+.run-btn {
+  background: var(--accent); color: #000; border: none; border-radius: 8px;
+  padding: 7px 18px; font-family: var(--mono); font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: opacity .15s, transform .1s;
+}
+.run-btn:hover { opacity: .88; }
+.run-btn:active { transform: scale(0.97); }
+.run-btn:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+
+/* ── LOG ── */
+.log { margin-bottom: 16px; max-height: 80px; overflow-y: auto; }
+.log-line { font-size: 11px; font-family: var(--mono); color: var(--text3); line-height: 1.8; }
+.log-line .ok { color: var(--accent); }
+.log-line .info { color: var(--blue); }
+.log-line .warn { color: var(--amber); }
+.log-line .err { color: var(--red); }
+.log-line .sec { color: var(--purple); }
+
+/* ── SUB-QUERIES ── */
+.subq-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 16px; }
+.subq-chip {
+  font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border2); color: var(--text3); transition: all .2s;
+}
+.subq-chip.running { border-color: var(--blue); color: var(--blue); }
+.subq-chip.done { border-color: var(--accent); color: var(--accent); }
+
+/* ── RESULTS ── */
+.result {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; margin-bottom: 8px; transition: border-color .15s;
+}
+.result:hover { border-color: var(--border2); }
+
+.result-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 3px; }
+.result-title { font-size: 13px; font-weight: 600; flex: 1; line-height: 1.3; }
+.result-title a { color: var(--text); text-decoration: none; }
+.result-title a:hover { color: var(--blue); }
+
+.score {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+}
+.s-hi { background: var(--accent-dim); color: var(--accent); }
+.s-md { background: rgba(96,165,250,.1); color: var(--blue); }
+.s-lo { background: var(--surface2); color: var(--text3); }
+
+.result-url { font-size: 10px; font-family: var(--mono); color: var(--text3); margin-bottom: 6px; }
+.result-text { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 8px; }
+
+.result-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.fb-btns { display: flex; gap: 4px; }
+.fb {
+  font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--border2); background: transparent; cursor: pointer; transition: all .15s;
+}
+.fb.yes { color: var(--accent); }
+.fb.yes:hover, .fb.yes.sel { background: var(--accent-dim); border-color: rgba(74,222,128,.3); }
+.fb.no { color: var(--red); }
+.fb.no:hover, .fb.no.sel { background: var(--red-dim); border-color: rgba(248,113,113,.3); }
+.fb.save { color: var(--amber); }
+.fb.save:hover, .fb.save.sel { background: var(--amber-dim); border-color: rgba(251,191,36,.3); }
+
+/* ── AI VERDICT ── */
+.ai-verdict-row { display: flex; align-items: center; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ai-v {
+  font-size: 9px; font-family: var(--mono); font-weight: 700;
+  padding: 1px 6px; border-radius: 3px; animation: fadeIn .3s;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.ai-ok { background: var(--accent-dim); color: var(--accent); }
+.ai-mid { background: var(--amber-dim); color: var(--amber); }
+.ai-bad { background: var(--red-dim); color: var(--red); }
+.ai-reason { font-size: 9px; font-family: var(--mono); color: var(--text3); font-style: italic; }
+
+/* ── EMPTY ── */
+.empty { padding: 60px 0; text-align: center; color: var(--text3); font-size: 13px; }
+.empty .icon { font-size: 28px; margin-bottom: 8px; }
+
+/* ── SPINNER ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 12px; height: 12px; border: 2px solid rgba(74,222,128,.2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+.ai-spin {
+  width: 8px; height: 8px; border: 1.5px solid rgba(167,139,250,.2);
+  border-top-color: var(--purple); border-radius: 50%;
+  animation: spin .6s linear infinite; display: inline-block;
+}
+
+/* ── ERROR ── */
+.err-banner {
+  background: var(--red-dim); border: 1px solid rgba(248,113,113,.2);
+  border-radius: 8px; padding: 10px 14px; font-size: 11px; color: var(--red);
+  margin-bottom: 12px; display: none;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 999px; }
+
+/* ── STATS FOOTER ── */
+.stats-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 6px 20px; display: flex; justify-content: center; gap: 20px;
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+}
+.stats-footer span { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="logo-mark">SMA</div>
+    <div class="header-text">
+      <h1>Search Memory Agent</h1>
+      <p>Exa neural search · Gemini AI judge · continual learning</p>
+    </div>
+  </div>
+
+  <div class="search-box">
+    <textarea id="query" placeholder="Ask anything… (Ctrl+Enter to run)"></textarea>
+    <div class="search-footer">
+      <div class="controls-left">
+        <div class="depth-btns">
+          <button class="depth-btn" onclick="setDepth('fast',this)">Fast</button>
+          <button class="depth-btn active" onclick="setDepth('auto',this)">Auto</button>
+          <button class="depth-btn" onclick="setDepth('deep-lite',this)">Deep</button>
+        </div>
+        <div class="ai-toggle" onclick="toggleAI()" title="AI auto-rates results using Gemini">
+          <div class="ai-dot on" id="ai-dot"></div>
+          <span>AI Judge</span>
+        </div>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="runAgent()">▶ Run</button>
+    </div>
+  </div>
+
+  <div class="log" id="log"></div>
+  <div class="err-banner" id="err-banner"></div>
+  <div id="subq-area"></div>
+  <div id="results"></div>
+  <div id="empty" class="empty">
+    <div class="icon">🔍</div>
+    <div>Enter a query and the agent will search, score, and learn.</div>
+  </div>
+
+</div>
+
+<div class="stats-footer">
+  <div>Searches <span id="s-searches">0</span></div>
+  <div>Feedback <span id="s-feedback">0</span></div>
+  <div>Domains learned <span id="s-domains">0</span></div>
+  <div>Quality <span id="s-quality">—</span></div>
+</div>
+
+<script>
+// ── STATE ──
+const SK = 'sma_mem_v3', FK = 'sma_sig_v3', TK = 'sma_sta_v3';
+let memory  = JSON.parse(localStorage.getItem(SK) || '[]');
+let signals = JSON.parse(localStorage.getItem(FK) || '{}');
+let stats   = JSON.parse(localStorage.getItem(TK) || '{"s":0,"f":0,"p":0,"n":0,"sc":[]}');
+let depth = 'auto', running = false, aiOn = true;
+
+const depthCfg = {
+  'fast':      { type:'auto',  n:3 },
+  'auto':      { type:'auto',  n:5 },
+  'deep-lite': { type:'neural',n:10 }
+};
+
+function save() {
+  localStorage.setItem(SK, JSON.stringify(memory));
+  localStorage.setItem(FK, JSON.stringify(signals));
+  localStorage.setItem(TK, JSON.stringify(stats));
+}
+
+// ── UI HELPERS ──
+function setDepth(v, btn) {
+  depth = v;
+  document.querySelectorAll('.depth-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleAI() {
+  aiOn = !aiOn;
+  document.getElementById('ai-dot').classList.toggle('on', aiOn);
+}
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'log-line';
+  d.innerHTML = `<span class="${cls}">${msg}</span>`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escA(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,' '); }
+
+function updateStats() {
+  document.getElementById('s-searches').textContent = stats.s;
+  document.getElementById('s-feedback').textContent = stats.f;
+  document.getElementById('s-domains').textContent = Object.keys(signals).length;
+  if (stats.sc.length) {
+    document.getElementById('s-quality').textContent = Math.round(stats.sc.reduce((a,b)=>a+b,0)/stats.sc.length*100)+'%';
+  }
+}
+
+// ── SCORING ──
+function scoreResult(r, q) {
+  const text = ((r.title||'') + ' ' + (r.highlights?r.highlights.join(' '):'')).toLowerCase();
+  const words = q.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+  const hits = words.filter(w=>text.includes(w)).length;
+  let base = words.length ? hits/words.length : 0;
+  if (r.score) base = Math.max(base, r.score);
+  if (r.highlights && r.highlights.length) base = Math.min(base+0.12, 1);
+  try {
+    const dom = new URL(r.url).hostname.replace('www.','');
+    const sig = signals[dom];
+    if (sig && (sig.yes+sig.no)>0) base = base*0.8 + (sig.yes/(sig.yes+sig.no))*0.2;
+  } catch {}
+  return Math.min(Math.round(base*100)/100, 1);
+}
+
+function scoreBadge(s) {
+  const cls = s>=0.65?'s-hi':s>=0.35?'s-md':'s-lo';
+  return `<span class="score ${cls}">${Math.round(s*100)}%</span>`;
+}
+
+// ── MEMORY ──
+function findMemory(q) {
+  const qw = q.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+  let best=null, bs=0;
+  for (const m of memory) {
+    const mw = m.q.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+    const ov = qw.filter(w=>mw.includes(w)).length / Math.max(qw.length,mw.length,1);
+    if (ov>bs && ov>0.28) { best=m; bs=ov; }
+  }
+  return best;
+}
+
+// ── SUB-QUERIES ──
+function buildSubs(q) {
+  const w = q.trim().split(' ');
+  const s = [q.trim()];
+  if (w.length>3) { s.push('latest developments '+w.slice(0,4).join(' ')); s.push(w.slice(0,3).join(' ')+' explained overview'); }
+  else { s.push('latest '+q.trim()); s.push(q.trim()+' overview'); }
+  return s.slice(0,3);
+}
+
+// ── EXA SEARCH ──
+async function exaSearch(q) {
+  const cfg = depthCfg[depth]||depthCfg.auto;
+  const res = await fetch('/api/search', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ query:q, type:cfg.type, num_results:cfg.n, contents:{highlights:{num_sentences:2,highlights_per_url:1}} })
+  });
+  if (!res.ok) throw new Error(`Exa ${res.status}`);
+  return res.json();
+}
+
+// ── FEEDBACK ──
+function feedback(idx, type, btn, domain) {
+  btn.closest('.fb-btns').querySelectorAll('.fb').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  if (!signals[domain]) signals[domain]={yes:0,no:0};
+  signals[domain][type]++;
+  stats.f++;
+  if (type==='yes') stats.p++; else stats.n++;
+  save(); updateStats();
+}
+
+function saveMem(query, title, domain, btn) {
+  btn.classList.add('sel'); btn.textContent='✓'; btn.disabled=true;
+  const ex = memory.find(m=>m.q===query);
+  if (ex) { ex.c++; if (!ex.doms.includes(domain)) ex.doms.push(domain); }
+  else { memory.push({id:Date.now(),q:query,t:title,d:domain,doms:[domain],c:1,ts:new Date().toLocaleString()}); }
+  save(); updateStats();
+}
+
+// ── RENDER RESULTS ──
+function renderResults(results, query) {
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  results.forEach((r,i) => {
+    const s = scoreResult(r, query);
+    stats.sc.push(s);
+    let dom; try { dom=new URL(r.url).hostname.replace('www.',''); } catch { dom='—'; }
+    const hl = r.highlights?.[0] || (r.text?r.text.slice(0,180)+'…':'No preview.');
+
+    const d = document.createElement('div');
+    d.className = 'result';
+    d.dataset.idx = i;
+    d.innerHTML = `
+      <div class="result-head">
+        <div class="result-title"><a href="${esc(r.url)}" target="_blank">${esc(r.title||'Untitled')}</a></div>
+        ${scoreBadge(s)}
+      </div>
+      <div class="result-url">${esc(dom)}</div>
+      <div class="result-text">${esc(hl)}</div>
+      <div class="result-actions">
+        <div class="fb-btns">
+          <button class="fb yes" onclick="feedback(${i},'yes',this,'${escA(dom)}')">👍</button>
+          <button class="fb no" onclick="feedback(${i},'no',this,'${escA(dom)}')">👎</button>
+          <button class="fb save" onclick="saveMem('${escA(query)}','${escA(r.title||'')}','${escA(dom)}',this)">💾</button>
+        </div>
+      </div>
+      <div class="ai-verdict-row" id="ai-${i}" style="display:none">
+        <span style="font-size:9px;font-family:var(--mono);color:var(--purple)">🤖</span>
+        <span id="aiv-${i}"><span class="ai-spin"></span></span>
+      </div>
+    `;
+    el.appendChild(d);
+  });
+  updateStats();
+}
+
+// ── AI EVALUATION ──
+async function aiEvaluate(results, query) {
+  results.forEach((_,i) => { const el=document.getElementById(`ai-${i}`); if(el) el.style.display='flex'; });
+  log('🤖 AI evaluating…', 'sec');
+
+  try {
+    const res = await fetch('/api/evaluate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ query, results: results.map(r=>({title:r.title||'',url:r.url||'',highlight:r.highlights?.[0]||''})) })
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(()=>({}));
+      log(`🤖 ${d.detail||d.error||'unavailable'}`, 'warn');
+      results.forEach((_,i) => { const el=document.getElementById(`ai-${i}`); if(el) el.style.display='none'; });
+      return;
+    }
+    const data = await res.json();
+    if (!data.evaluations) return;
+
+    let relevant=0, irrelevant=0;
+    for (const ev of data.evaluations) {
+      const i = ev.index;
+      const vEl = document.getElementById(`aiv-${i}`);
+      if (!vEl) continue;
+
+      const cls = ev.verdict==='relevant'?'ai-ok':ev.verdict==='irrelevant'?'ai-bad':'ai-mid';
+      const icon = ev.verdict==='relevant'?'✓':ev.verdict==='irrelevant'?'✗':'~';
+      vEl.innerHTML = `<span class="ai-v ${cls}">${icon} ${ev.verdict} · ${Math.round((ev.score||0)*100)}%</span> <span class="ai-reason">${esc(ev.reason||'')}</span>`;
+
+      // Auto-feedback
+      let dom; try { dom=new URL(results[i]?.url).hostname.replace('www.',''); } catch { continue; }
+      if (!signals[dom]) signals[dom]={yes:0,no:0};
+
+      if (ev.verdict==='relevant' && ev.score>=0.65) {
+        signals[dom].yes++; stats.f++; stats.p++; relevant++;
+        const card=document.querySelector(`.result[data-idx="${i}"]`);
+        if(card){const b=card.querySelector('.fb.yes');if(b&&!b.classList.contains('sel')){b.classList.add('sel');b.textContent='👍✓';}}
+      } else if (ev.verdict==='irrelevant' && ev.score<=0.3) {
+        signals[dom].no++; stats.f++; stats.n++; irrelevant++;
+        const card=document.querySelector(`.result[data-idx="${i}"]`);
+        if(card){const b=card.querySelector('.fb.no');if(b&&!b.classList.contains('sel')){b.classList.add('sel');b.textContent='👎✗';}}
+      }
+    }
+    save(); updateStats();
+    log(`🤖 Done: ${relevant} relevant, ${irrelevant} irrelevant`, 'ok');
+  } catch (e) {
+    log(`🤖 Error: ${e.message}`, 'err');
+    results.forEach((_,i) => { const el=document.getElementById(`ai-${i}`); if(el) el.style.display='none'; });
+  }
+}
+
+// ── MAIN AGENT LOOP ──
+async function runAgent() {
+  const query = document.getElementById('query').value.trim();
+  if (!query || running) return;
+  running = true;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('err-banner').style.display = 'none';
+
+  log('Agent started', 'info');
+
+  // Memory
+  const mem = findMemory(query);
+  if (mem) log(`Memory hit: "${mem.q.slice(0,40)}…"`, 'sec');
+
+  // Sub-queries
+  const subs = buildSubs(query);
+  log(`${subs.length} sub-queries`, 'info');
+  const sqEl = document.getElementById('subq-area');
+  sqEl.innerHTML = `<div class="subq-list">${subs.map((q,i)=>`<div class="subq-chip" id="sq-${i}">${esc(q)}</div>`).join('')}</div>`;
+
+  let all = [], fails = 0;
+  for (let i=0; i<subs.length; i++) {
+    const chip = document.getElementById(`sq-${i}`);
+    chip.classList.add('running');
+    try {
+      const data = await exaSearch(subs[i]);
+      if (data.results) all.push(...data.results);
+      chip.classList.remove('running'); chip.classList.add('done');
+      log(`↳ ${data.results?.length||0} results`, 'ok');
+    } catch(e) { fails++; chip.classList.remove('running'); log(`↳ ${e.message}`, 'err'); }
+    await new Promise(r=>setTimeout(r,200));
+  }
+
+  stats.s++; save();
+
+  if (fails===subs.length) {
+    document.getElementById('err-banner').style.display = 'block';
+    document.getElementById('err-banner').innerHTML = '⚠️ All searches failed. Check API key or network. <button onclick="runAgent()" style="background:var(--red);color:#000;border:none;border-radius:4px;padding:2px 10px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;margin-left:6px">Retry</button>';
+    btn.disabled=false; btn.innerHTML='▶ Run'; running=false; return;
+  }
+
+  // Dedup + sort
+  const seen = new Set();
+  all = all.filter(r=>{if(seen.has(r.url))return false;seen.add(r.url);return true;});
+  all.sort((a,b)=>scoreResult(b,query)-scoreResult(a,query));
+  const top = all.slice(0,8);
+
+  log(`${top.length} results (deduped)`, 'ok');
+  renderResults(top, query);
+
+  // AI Judge
+  if (aiOn && top.length>0) await aiEvaluate(top, query);
+
+  btn.disabled=false; btn.innerHTML='▶ Run'; running=false;
+  updateStats();
+}
+
+// Ctrl+Enter
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) runAgent();
+});
+
+updateStats();
+</script>
+</body>
+</html>
