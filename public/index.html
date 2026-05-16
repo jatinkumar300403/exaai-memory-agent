@@ -90,6 +90,14 @@ button { cursor: pointer; font-family: var(--font-sans); border: none; backgroun
 
 @keyframes spin { 100% { transform: rotate(360deg); } }
 .spinner { width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--text-muted); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+
+@media (max-width: 768px) {
+  body { height: auto; overflow: visible; }
+  .app { flex-direction: column; height: auto; }
+  .main { border-right: none; padding: 20px; overflow-y: visible; height: auto; }
+  .sidebar { width: 100%; height: auto; border-left: none; border-top: 1px solid var(--border); }
+  .search-controls { flex-direction: column; gap: 16px; align-items: flex-start; }
+}
 </style>
 </head>
 <body>
